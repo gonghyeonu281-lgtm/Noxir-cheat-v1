@@ -1,5 +1,5 @@
 --[========================================================================]
---[  Noxir Cheat v1 - Ultimate Suite (Range Fix + Skin + Rage + ESP)      ]
+--[  Noxir Cheat v1 - Ultimate Suite (Silent Invisible Back RageBot)      ]
 --[========================================================================]
 
 local Players = game:GetService("Players")
@@ -103,14 +103,10 @@ DataController.Get = function(self, key)
     return data
 end
 
--- 사격장 및 일반 매치 모두에서 무기 데이터 오버라이드 강제 적용
 local originalGetWeaponData = DataController.GetWeaponData
 DataController.GetWeaponData = function(self, weaponName)
     local data = originalGetWeaponData(self, weaponName)
-    if not data then
-        -- 사격장에서 데이터가 간헐적으로 비어있을 경우 기본 구조 생성 후 스킨 강제 주입
-        data = {Name = weaponName}
-    end
+    if not data then data = {Name = weaponName} end
     local merged = {}
     for key, value in pairs(data) do merged[key] = value end
     merged.Name = weaponName
@@ -119,7 +115,6 @@ DataController.GetWeaponData = function(self, weaponName)
         if equipped[weaponName] then
             for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do merged[cosmeticType] = cosmeticData end
         else
-            -- 저장된 커스텀 세팅이 없더라도 사격장에서 기본 스킨 하나를 자동 할당하여 적용
             for cName, cData in pairs(CosmeticLibrary.Cosmetics) do
                 if cData.Type == "Skin" and cData.Weapon == weaponName then
                     merged.Skin = cloneCosmetic(cName, "Skin")
@@ -134,7 +129,7 @@ end
 loadConfig()
 
 -- ==========================================
--- 2. 레이지 봇, 보이드 스팸, ESP, 래피드 파이어
+-- 2. 사일런트 레이지 봇 (위치 노출 없는 비주얼 백 헤드 락온)
 -- ==========================================
 local espBoxes = {}
 
@@ -172,7 +167,7 @@ local function updateESP()
     end
 end
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     pcall(updateESP)
 
     if features.RageBot then
@@ -195,18 +190,10 @@ RunService.RenderStepped:Connect(function()
                 end
                 
                 if closestTarget and closestTarget:FindFirstChild("Head") and closestTarget:FindFirstChild("HumanoidRootPart") then
-                    local targetHrp = closestTarget.HumanoidRootPart
                     local targetHead = closestTarget.Head
                     
-                    local offsetPos = targetHrp.CFrame * CFrame.new(0, 2, 3).Position
-                    if features.VoidSpam then
-                        local randX = math.random(-4, 4)
-                        local randZ = math.random(-4, 4)
-                        offsetPos = targetHrp.CFrame * CFrame.new(randX, math.random(1, 3), randZ).Position
-                    end
-                    
-                    myChar.HumanoidRootPart.CFrame = CFrame.new(offsetPos, targetHead.Position)
-                    camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)
+                    -- 캐릭터 본체는 절대 움직이지 않고, 시점(Camera)만 상대방 헤드 쪽으로 부드럽게 조준하여 사격 판정 유도
+                    camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, targetHead.Position), math.clamp(dt * 30, 0, 1))
                 end
             end
         end)
@@ -286,7 +273,7 @@ TitleBar.Parent = MainFrame
 TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 TitleBar.Size = UDim2.new(1, 0, 0, 35)
 TitleBar.Font = Enum.Font.GothamBold
-TitleBar.Text = "  Noxir Cheat v1 | Range Fix"
+TitleBar.Text = "  Noxir Cheat v1 | Silent Aim"
 TitleBar.TextColor3 = Color3.fromRGB(240, 240, 240)
 TitleBar.TextSize = 13
 TitleBar.TextXAlignment = Enum.TextXAlignment.Left
@@ -343,7 +330,7 @@ local function createToggle(name, text, initialState, callback)
     end)
 end
 
-createToggle("RageBotToggle", "Rage Bot", true, function(enabled) features.RageBot = enabled end)
+createToggle("RageBotToggle", "Silent Rage Bot (Invisible Pos)", true, function(enabled) features.RageBot = enabled end)
 createToggle("VoidSpamToggle", "Void Spam", false, function(enabled) features.VoidSpam = enabled end)
 createToggle("ESPToggle", "ESP", true, function(enabled) features.ESP = enabled end)
 createToggle("RapidFireToggle", "Rapid Fire", true, function(enabled) features.RapidFire = enabled end)
@@ -353,4 +340,4 @@ ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
-print("[Noxir] Ultimate Suite (Range Fix) Loaded!")
+print("[Noxir] Ultimate Suite (Silent Aim) Loaded!")
