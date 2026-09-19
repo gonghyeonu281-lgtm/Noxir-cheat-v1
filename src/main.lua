@@ -1,5 +1,5 @@
 --[========================================================================]
---[  Noxir Cheat v1 - Ultimate Suite (Skin + Rage + Void + ESP + Rapid)   ]
+--[  Noxir Cheat v1 - Ultimate Suite (Range Fix + Skin + Rage + ESP)      ]
 --[========================================================================]
 
 local Players = game:GetService("Players")
@@ -13,14 +13,13 @@ local player = Players.LocalPlayer
 local playerScripts = player:WaitForChild("PlayerScripts")
 local controllers = playerScripts:WaitForChild("Controllers")
 
--- 기능 토글 및 설정 변수
 local features = {
     AntiCheatBypass = true,
     AllSkin = true,
-    RageBot = true,       -- 상대 뒤 + 위로 2m 이동 후 헤드 락온
-    VoidSpam = false,     -- 레이지봇과 연동되는 랜덤 위치 스팸
-    ESP = true,           -- 적 위치 표시 ESP
-    RapidFire = true      -- 연사 속도 극대화
+    RageBot = true,
+    VoidSpam = false,
+    ESP = true,
+    RapidFire = true
 }
 
 -- ==========================================
@@ -40,7 +39,7 @@ pcall(function()
 end)
 
 -- ==========================================
--- 1. 올스킨 및 인벤토리 언락커
+-- 1. 올스킨 및 사격장 호환 언락커 코어
 -- ==========================================
 local EnumLibrary = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10))
 if EnumLibrary then pcall(function() EnumLibrary:WaitForEnumBuilder() end) end
@@ -104,15 +103,30 @@ DataController.Get = function(self, key)
     return data
 end
 
+-- 사격장 및 일반 매치 모두에서 무기 데이터 오버라이드 강제 적용
 local originalGetWeaponData = DataController.GetWeaponData
 DataController.GetWeaponData = function(self, weaponName)
     local data = originalGetWeaponData(self, weaponName)
-    if not data then return nil end
+    if not data then
+        -- 사격장에서 데이터가 간헐적으로 비어있을 경우 기본 구조 생성 후 스킨 강제 주입
+        data = {Name = weaponName}
+    end
     local merged = {}
     for key, value in pairs(data) do merged[key] = value end
     merged.Name = weaponName
-    if features.AllSkin and equipped[weaponName] then
-        for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do merged[cosmeticType] = cosmeticData end
+    
+    if features.AllSkin then
+        if equipped[weaponName] then
+            for cosmeticType, cosmeticData in pairs(equipped[weaponName]) do merged[cosmeticType] = cosmeticData end
+        else
+            -- 저장된 커스텀 세팅이 없더라도 사격장에서 기본 스킨 하나를 자동 할당하여 적용
+            for cName, cData in pairs(CosmeticLibrary.Cosmetics) do
+                if cData.Type == "Skin" and cData.Weapon == weaponName then
+                    merged.Skin = cloneCosmetic(cName, "Skin")
+                    break
+                end
+            end
+        end
     end
     return merged
 end
@@ -120,7 +134,7 @@ end
 loadConfig()
 
 -- ==========================================
--- 2. 레이지 봇, 보이드 스팸, ESP, 래피드 파이어 로직
+-- 2. 레이지 봇, 보이드 스팸, ESP, 래피드 파이어
 -- ==========================================
 local espBoxes = {}
 
@@ -159,10 +173,8 @@ local function updateESP()
 end
 
 RunService.RenderStepped:Connect(function()
-    -- ESP 업데이트
     pcall(updateESP)
 
-    -- 레이지 봇 (상대 뒤 + 상단 2m 이동 후 헤드 락온)
     if features.RageBot then
         pcall(function()
             local camera = Workspace.CurrentCamera
@@ -186,7 +198,6 @@ RunService.RenderStepped:Connect(function()
                     local targetHrp = closestTarget.HumanoidRootPart
                     local targetHead = closestTarget.Head
                     
-                    -- 보이드 스팸이 켜져있으면 상대 위나 옆으로 랜덤 위치 변동 콤보
                     local offsetPos = targetHrp.CFrame * CFrame.new(0, 2, 3).Position
                     if features.VoidSpam then
                         local randX = math.random(-4, 4)
@@ -201,7 +212,6 @@ RunService.RenderStepped:Connect(function()
         end)
     end
     
-    -- 래피드 파이어 (연사 속도 관련 딜레이 단축 패킷 조작)
     if features.RapidFire then
         pcall(function()
             local tool = player.Character and player.Character:FindFirstChildOfClass("Tool")
@@ -218,7 +228,7 @@ end)
 
 
 -- ==========================================
--- 3. Noxir Cheat v1 - 모바일 UI 메뉴 시스템
+-- 3. UI 메뉴 시스템
 -- ==========================================
 if CoreGui:FindFirstChild("NoxirCheatGUI") then
     CoreGui.NoxirCheatGUI:Destroy()
@@ -276,7 +286,7 @@ TitleBar.Parent = MainFrame
 TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 TitleBar.Size = UDim2.new(1, 0, 0, 35)
 TitleBar.Font = Enum.Font.GothamBold
-TitleBar.Text = "  Noxir Cheat v1 | Ultimate Suite"
+TitleBar.Text = "  Noxir Cheat v1 | Range Fix"
 TitleBar.TextColor3 = Color3.fromRGB(240, 240, 240)
 TitleBar.TextSize = 13
 TitleBar.TextXAlignment = Enum.TextXAlignment.Left
@@ -333,28 +343,14 @@ local function createToggle(name, text, initialState, callback)
     end)
 end
 
-createToggle("RageBotToggle", "Rage Bot (Back + 2m Up Head)", true, function(enabled)
-    features.RageBot = enabled
-end)
-
-createToggle("VoidSpamToggle", "Void Spam (Random Pos Combo)", false, function(enabled)
-    features.VoidSpam = enabled
-end)
-
-createToggle("ESPToggle", "ESP (Player Box)", true, function(enabled)
-    features.ESP = enabled
-end)
-
-createToggle("RapidFireToggle", "Rapid Fire", true, function(enabled)
-    features.RapidFire = enabled
-end)
-
-createToggle("AllSkinToggle", "All Skins Unlocked", true, function(enabled)
-    features.AllSkin = enabled
-end)
+createToggle("RageBotToggle", "Rage Bot", true, function(enabled) features.RageBot = enabled end)
+createToggle("VoidSpamToggle", "Void Spam", false, function(enabled) features.VoidSpam = enabled end)
+createToggle("ESPToggle", "ESP", true, function(enabled) features.ESP = enabled end)
+createToggle("RapidFireToggle", "Rapid Fire", true, function(enabled) features.RapidFire = enabled end)
+createToggle("AllSkinToggle", "All Skins Unlocked", true, function(enabled) features.AllSkin = enabled end)
 
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
 end)
 
-print("[Noxir] Ultimate Hack Suite Loaded!")
+print("[Noxir] Ultimate Suite (Range Fix) Loaded!")
