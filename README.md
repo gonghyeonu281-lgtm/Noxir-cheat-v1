@@ -1,2 +1,2 @@
-# Noxir-cheat-v1
+걱
 rival cheat script
